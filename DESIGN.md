@@ -299,3 +299,10 @@ v0.2.2的 details-device.png（758×1024）是当时Sage前台截图，页角/�
 - **状态栏合并**：原生 `deviceState()` 增加 `wifi`（0–4 级，依据 `WifiManager.calculateSignalLevel`），网页侧用三段弧线图元表示强度，0 级加一道斜线。电量、Wi-Fi、齿轮收在右侧一组。
 - **修图片渲染**：`WebResourceResponse` 对 `image/*` 传了 `"UTF-8"` 字符集，WebView 61 按文本转码导致 PNG 全空白；改为二进制资源传 `null` 编码。
 - **构建**：`aapt` 增加 `-S android/res`（设备管理员元数据）；产物改名 `QuiteSage.apk`；缺真实划线时自动回退占位数据。
+
+
+## 当前版本补充：0.9.1（versionCode 22）
+
+本节为追加记录；旧版本段落保留供追溯。首页入口现为「微信读书 / 阅读档案 / 纸上随记 / 全部应用」，旧阅读档案横条移除。首页摘录使用本地 QuiteSage Serif（Noto Serif SC 静态 450 字重子集，WOFF2 / OFL），UI 无衬线字体不变。CSS 常规字重槽加载该静态字体，不表示字体源为 400 字重。保持既有纸白、墨黑及灰阶界面。手写随记沿用同一工具与面板语言；不把截图验收等同于实机延迟或持久化认证。
+
+当前实机、验证边界、未实现的 OEM 壁纸轮换及历史文档漂移以 [当前状态](docs/06-paper-notes-current.md) 为准。

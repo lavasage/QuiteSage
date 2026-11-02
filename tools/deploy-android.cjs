@@ -2,8 +2,16 @@ const fs=require('fs'),path=require('path'),cp=require('child_process');
 const root=path.resolve(__dirname,'..');
 const adb='C:/Users/lcc30/AppData/Local/Android/Sdk/platform-tools/adb.exe';
 const serialIndex=process.argv.indexOf('--serial');
-const serial=serialIndex<0?(process.env.ADB_SERIAL||''):process.argv[serialIndex+1],pkg='com.sagepaper.launcher';
-if(!serial)throw new Error('需要 --serial <设备序列号> 或环境变量 ADB_SERIAL');
+function detectSerial(){
+ // 只连一台设备时不用手写序列号；多台再要求 --serial
+ try{
+  const out=cp.spawnSync(adb,['devices'],{encoding:'utf8',timeout:8000}).stdout||'';
+  const ids=out.split('\n').slice(1).map(l=>l.trim()).filter(l=>/\tdevice$/.test(l)).map(l=>l.split('\t')[0]);
+  return ids.length===1?ids[0]:'';
+ }catch(e){return '';}
+}
+const serial=serialIndex<0?(process.env.ADB_SERIAL||detectSerial()):process.argv[serialIndex+1],pkg='com.sagepaper.launcher';
+if(!serial)throw new Error('需要 --serial <设备序列号> 或环境变量 ADB_SERIAL（或只连一台设备）');
 if(!serial||!/^[A-Za-z0-9._:/-]+$/.test(serial))throw new Error('Invalid --serial');
 const manifest=fs.readFileSync(path.join(root,'android/AndroidManifest.xml'),'utf8');
 const expectedCode=manifest.match(/android:versionCode="(\d+)"/)[1];

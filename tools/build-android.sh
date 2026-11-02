@@ -12,7 +12,7 @@ JDK="${JDK_BIN:-D:/新建文件夹 (2)/jbr/bin}"
 OUT="$ROOT/android/build"
 
 mkdir -p "$OUT/classes" "$OUT/dex" "$OUT/assets"
-cp prototype/index.html prototype/app.js prototype/style.css "$OUT/assets/"
+cp prototype/index.html prototype/app.js prototype/notes.js prototype/style.css "$OUT/assets/"
 cp prototype/assets/*.png prototype/assets/*.json "$OUT/assets/" 2>/dev/null || true
 if [ -f .private/excerpts.json ] && [ -f .private/stats.json ]; then
   cp .private/excerpts.json "$OUT/assets/excerpts.json"
@@ -23,6 +23,8 @@ else
   cp .private/demo-excerpts.json "$OUT/assets/excerpts.json"
   cp .private/demo-stats.json "$OUT/assets/stats.json"
 fi
+mkdir -p "$OUT/assets/fonts"
+cp prototype/assets/fonts/* "$OUT/assets/fonts/"
 cp .private/sage-development.jks "$OUT/sage.jks"
 
 cd "$OUT"

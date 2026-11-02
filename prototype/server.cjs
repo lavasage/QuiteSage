@@ -1,7 +1,8 @@
 const http=require('http'),fs=require('fs'),path=require('path');
 const root=__dirname;
-const files={'/':['index.html','text/html; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8']};
+const files={'/':['index.html','text/html; charset=utf-8'],'/notes.js':['notes.js','text/javascript; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8']};
 for(const n of fs.readdirSync(path.join(root,'assets'))){if(n.endsWith('.png'))files['/assets/'+n]=['assets/'+n,'image/png'];} 
+files['/assets/fonts/QuiteSageSerif-Regular.woff2']=['assets/fonts/QuiteSageSerif-Regular.woff2','font/woff2'];
 const pick=(real,demo)=>fs.existsSync(path.join(root,real))?real:demo;
 files['/api/excerpts']=[pick('../.private/excerpts.json','../.private/demo-excerpts.json'),'application/json; charset=utf-8'];
 files['/api/stats']=[pick('../.private/stats.json','../.private/demo-stats.json'),'application/json; charset=utf-8'];

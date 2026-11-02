@@ -40,7 +40,7 @@ public class SageActivity extends Activity {
     private static final String READER="com.tencent.weread.eink";
     private static final String[] PLATES={"plate-entropy","plate-cave","plate-attention","plate-belief"};
     private final BroadcastReceiver updates=new BroadcastReceiver(){public void onReceive(Context c,Intent i){updateDevice();}};
-    private final BroadcastReceiver screenOff=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(Intent.ACTION_SCREEN_OFF.equals(i.getAction()))rotateWallpaper();}};
+    private final BroadcastReceiver screenOn=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(Intent.ACTION_SCREEN_ON.equals(i.getAction()))rotateWallpaper();}};
     private SharedPreferences prefs(){return getSharedPreferences("sage",MODE_PRIVATE);}
     private static String dayKey(){return new SimpleDateFormat("yyyy-MM-dd",Locale.US).format(new Date());}
     public void onCreate(Bundle state){
@@ -63,21 +63,23 @@ public class SageActivity extends Activity {
                     String p=u.getPath(); InputStream in;String mime;
                     if("/".equals(p)||"/index.html".equals(p)){in=getAssets().open("index.html");mime="text/html";}
                     else if("/style.css".equals(p)){in=getAssets().open("style.css");mime="text/css";}
+                    else if("/notes.js".equals(p)){in=getAssets().open("notes.js");mime="text/javascript";}
                     else if("/app.js".equals(p)){in=getAssets().open("app.js");mime="text/javascript";}
                     else if("/api/excerpts".equals(p)){in=getAssets().open("excerpts.json");mime="application/json";}
                     else if("/api/stats".equals(p)){in=getAssets().open("stats.json");mime="application/json";}
+                    else if("/assets/fonts/QuiteSageSerif-Regular.woff2".equals(p)){in=getAssets().open("fonts/QuiteSageSerif-Regular.woff2");mime="font/woff2";}
                     else if(p!=null&&p.indexOf("/assets/")==0){
                         String name=p.substring("/assets/".length());
                         if(name.length()==0||name.indexOf("..")>=0||name.indexOf('/')>=0||name.indexOf('\\')>=0)return error(404,"Not found");
                         String low=name.toLowerCase(Locale.US);
                         mime=low.endsWith(".png")?"image/png":low.endsWith(".json")?"application/json":"application/octet-stream";
-                        in=getAssets().open("assets/"+name);
+                        in=getAssets().open(name);
                     }
                     else return error(404,"Not found");
                     Map<String,String> headers=new HashMap<String,String>();headers.put("Cache-Control","no-store");
                     headers.put("Content-Security-Policy","default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'");
                     // 二进制资源不能带字符集，否则 WebView 会按文本转码，图片直接渲染失败。
-                    String enc=mime.indexOf("image/")==0?null:"UTF-8";
+                    String enc=(mime.indexOf("image/")==0||mime.indexOf("font/")==0)?null:"UTF-8";
                     return new WebResourceResponse(mime,enc,200,"OK",headers,in);
                 }catch(Exception ex){return error(503,"Snapshot unavailable");}
             }
@@ -87,7 +89,7 @@ public class SageActivity extends Activity {
         });
         web.loadUrl(ORIGIN+"/?device=1");
         rotateWallpaper();
-        try{registerReceiver(screenOff,new IntentFilter(Intent.ACTION_SCREEN_OFF));screenRegistered=true;}catch(Exception ignored){}
+        try{registerReceiver(screenOn,new IntentFilter(Intent.ACTION_SCREEN_ON));screenRegistered=true;}catch(Exception ignored){}
     }
     private WebResourceResponse error(int status,String message){return new WebResourceResponse("text/plain","UTF-8",status,message,new HashMap<String,String>(),new ByteArrayInputStream(message.getBytes()));}
     /* 沉浸式全屏：状态栏和导航栏都不占位，也不留常驻条。 */
@@ -164,10 +166,15 @@ public class SageActivity extends Activity {
         }return a.toString();
     }
     private void launchApp(String pkg){try{Intent i=getPackageManager().getLaunchIntentForPackage(pkg);if(i!=null){if(READER.equals(pkg))prefs().edit().putString("lastReaderLaunch",dayKey()).apply();startActivity(i);return;}}catch(Exception ignored){}Toast.makeText(this,"应用未安装或无法启动",Toast.LENGTH_LONG).show();}
+    private boolean hasOemWallpaper(){try{Class.forName("android.util.MoguWallPaper");return true;}catch(ClassNotFoundException absent){return false;}}
     private boolean applyWallpaper(String name,boolean toast){
+        if(hasOemWallpaper()){
+            if(toast){try{startActivity(new Intent().setComponent(new ComponentName("com.mgs.settings","com.mgs.settings.DevicesSettingsActivity")));}catch(Exception e){startActivity(new Intent().setComponent(new ComponentName("com.mgs.settings","com.mgs.settings.MgsSettingsActivity")));}}
+            return false;
+        }
         try{
             if(name==null||name.length()==0||name.indexOf("..")>=0||name.indexOf('/')>=0)throw new IOException("bad wallpaper name");
-            InputStream in=getAssets().open("assets/"+name+".png");
+            InputStream in=getAssets().open(name+".png");
             Bitmap b=BitmapFactory.decodeStream(in);in.close();
             if(b==null)throw new IOException("wallpaper decode failed");
             WallpaperManager wm=WallpaperManager.getInstance(this);
@@ -177,18 +184,28 @@ public class SageActivity extends Activity {
             if(toast)Toast.makeText(this,"已设为设备壁纸",Toast.LENGTH_LONG).show();
             return true;
         }catch(Exception e){
+            android.util.Log.e("SageWallpaper","Cannot apply "+name,e);
             if(toast)Toast.makeText(this,"此设备不接受直接设置壁纸，请在系统设置里更换",Toast.LENGTH_LONG).show();
         }
         if(toast)Toast.makeText(this,"壁纸切换失败，请在系统设置里更换",Toast.LENGTH_LONG).show();
         return false;
     }
     private void rotateWallpaper(){
+        if(hasOemWallpaper())return;
         SharedPreferences p=prefs();
         if(!p.getBoolean("rotate",true))return;
-        int i=p.getInt("rotateIndex",-1)+1;
-        if(i<0||i>=PLATES.length)i=0;
-        p.edit().putInt("rotateIndex",i).apply();
-        if(!applyWallpaper(PLATES[i],false))Toast.makeText(this,"锁屏壁纸切换失败，请在系统设置里更换",Toast.LENGTH_LONG).show();
+        String bag=p.getString("rotateBag","");
+        if(bag.length()==0){
+            List<Integer> order=new ArrayList<Integer>();
+            for(int n=0;n<PLATES.length;n++)order.add(n);
+            Collections.shuffle(order);
+            if(order.get(0)==p.getInt("rotateIndex",-1))Collections.swap(order,0,1);
+            StringBuilder sequence=new StringBuilder();for(int n:order)sequence.append(n);
+            bag=sequence.toString();
+        }
+        int i=bag.charAt(0)-'0';
+        if(applyWallpaper(PLATES[i],false))p.edit().putInt("rotateIndex",i).putString("rotateBag",bag.substring(1)).apply();
+        else android.util.Log.e("SageWallpaper","Rotation failed: "+PLATES[i]);
     }
     /* 今日是否打开过微信读书：优先用量统计，未授权时退回"从桌面启动过"的记录。 */
     private boolean readerOpenedToday(){
@@ -219,10 +236,11 @@ public class SageActivity extends Activity {
         @JavascriptInterface public String listApps(){return SageActivity.this.listApps();}
         @JavascriptInterface public void launchApp(final String p){runOnUiThread(new Runnable(){public void run(){SageActivity.this.launchApp(p);}});}
         @JavascriptInterface public void setWallpaper(final String n){runOnUiThread(new Runnable(){public void run(){
-            for(int i=0;i<PLATES.length;i++)if(PLATES[i].equals(n))prefs().edit().putInt("rotateIndex",i).apply();
+            for(int i=0;i<PLATES.length;i++)if(PLATES[i].equals(n))prefs().edit().putInt("rotateIndex",i).remove("rotateBag").apply();
             applyWallpaper(n,true);
         }});}
-        @JavascriptInterface public boolean rotationEnabled(){return prefs().getBoolean("rotate",true);}
+        @JavascriptInterface public boolean rotationSupported(){return !hasOemWallpaper();}
+        @JavascriptInterface public boolean rotationEnabled(){return !hasOemWallpaper()&&prefs().getBoolean("rotate",true);}
         @JavascriptInterface public void setRotation(final boolean on){runOnUiThread(new Runnable(){public void run(){
             SharedPreferences p=prefs();p.edit().putBoolean("rotate",on).apply();
             Toast.makeText(SageActivity.this,on?"轮播已开启：每次进入锁屏换一张":"轮播已关闭",Toast.LENGTH_SHORT).show();
@@ -238,5 +256,5 @@ public class SageActivity extends Activity {
     protected void onPause(){if(web!=null)web.onPause();super.onPause();}
     protected void onStop(){if(registered){unregisterReceiver(updates);registered=false;}super.onStop();}    public void onBackPressed(){web.evaluateJavascript("window.SageGoHome&&window.SageGoHome();",null);}
     protected void onNewIntent(Intent i){super.onNewIntent(i);if(Intent.ACTION_MAIN.equals(i.getAction()))web.evaluateJavascript("window.SageGoHome&&window.SageGoHome();",null);}
-    protected void onDestroy(){if(web!=null){web.removeJavascriptInterface("SageNative");web.destroy();web=null;}if(screenRegistered){try{unregisterReceiver(screenOff);}catch(Exception ignored){}screenRegistered=false;}super.onDestroy();}
+    protected void onDestroy(){if(web!=null){web.removeJavascriptInterface("SageNative");web.destroy();web=null;}if(screenRegistered){try{unregisterReceiver(screenOn);}catch(Exception ignored){}screenRegistered=false;}super.onDestroy();}
 }

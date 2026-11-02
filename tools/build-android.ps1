@@ -7,7 +7,7 @@ $jdk='D:\新建文件夹 (2)\jbr\bin'
 $jar=Join-Path $sdk 'platforms\android-35\android.jar'
 $out=Join-Path $root 'android\build'
 New-Item -ItemType Directory -Force -Path $out,(Join-Path $out 'classes'),(Join-Path $out 'dex'),(Join-Path $out 'assets') | Out-Null
-foreach($name in @('index.html','app.js','style.css')){Copy-Item -LiteralPath (Join-Path $root ('prototype\'+$name)) -Destination (Join-Path $out 'assets') -Force}
+foreach($name in @('index.html','app.js','notes.js','style.css')){Copy-Item -LiteralPath (Join-Path $root ('prototype\'+$name)) -Destination (Join-Path $out 'assets') -Force}
 Copy-Item -LiteralPath 'prototype/assets' -Destination (Join-Path $out 'assets') -Recurse -Force
 & node 'tools/prepare-excerpts.cjs'
 if($LASTEXITCODE -ne 0){throw 'Unable to prepare real excerpts.'}

@@ -63,7 +63,7 @@ holdAction(document.getElementById('next-excerpt'),previousExcerpt);
 function loadExcerpts(){
  var request=new XMLHttpRequest();request.open('GET','/api/excerpts');request.timeout=12000;
  function unavailable(){document.getElementById('excerpt-text').textContent='摘抄暂时没有送达。';document.getElementById('excerpt-text').classList.remove('loading');document.getElementById('excerpt-source').hidden=true;var b=document.getElementById('next-excerpt');b.disabled=false;b.querySelector('span').textContent='重新载入';b.onclick=loadExcerpts;}
- request.onload=function(){try{if(request.status!==200)throw new Error('Unavailable');var data=JSON.parse(request.responseText);excerpts=(data.excerpts||[]).filter(function(x){return x.id&&x.text&&x.title&&x.author;});bag=[];excerptInfo=data;if(!excerpts.length){document.getElementById('excerpt-text').textContent='还没有适合展示的完整划线。';document.getElementById('excerpt-text').classList.remove('loading');document.getElementById('next-excerpt').disabled=true;return;}var b=document.getElementById('next-excerpt');b.querySelector('span').textContent='换一则';b.onclick=nextExcerpt;nextExcerpt();fillStrip();deepLink();}catch(e){unavailable();}};
+ request.onload=function(){try{if(request.status!==200)throw new Error('Unavailable');var data=JSON.parse(request.responseText);excerpts=(data.excerpts||[]).filter(function(x){return x.id&&x.text&&x.title&&x.author;});bag=[];excerptInfo=data;if(!excerpts.length){document.getElementById('excerpt-text').textContent='还没有适合展示的完整划线。';document.getElementById('excerpt-text').classList.remove('loading');document.getElementById('next-excerpt').disabled=true;return;}var b=document.getElementById('next-excerpt');b.querySelector('span').textContent='换一则';b.onclick=nextExcerpt;nextExcerpt();deepLink();}catch(e){unavailable();}};
  request.onerror=unavailable;request.ontimeout=unavailable;request.send();
 }
 document.getElementById('excerpt-source').onclick=function(){
@@ -75,10 +75,11 @@ var THEMES=[{id:'plate-entropy',name:'熵与秩序',words:'有序 · 无序 · �
 var themeIndex=0;try{themeIndex=parseInt(localStorage.getItem('sage-lock-theme')||'0',10)||0;}catch(ignore){}if(themeIndex<0||themeIndex>=THEMES.length)themeIndex=0;
 function themePanel(){
  var rows=THEMES.map(function(t,i){return '<button class="theme-row" data-theme="'+i+'"><img src="/assets/'+t.id+'.png" alt=""><span><b>'+esc(t.name)+'</b><i>'+esc(t.words)+'</i></span>'+(i===themeIndex?'<em>当前</em>':'')+'</button>';}).join('');
- var on=rotationEnabled();
- var head='<button class="theme-rotate" data-action="rotate"><span>锁屏轮播</span><em'+(on?' class="on"':'')+'>'+(on?'已开启':'已关闭')+'</em></button>';
- openPanel('锁屏壁纸',head+rows+'<p class="theme-note">'+(on?'轮播中：每次进入锁屏自动换下一幅，'+THEMES.length+' 幅循环。':'开启后每次进入锁屏换一幅，'+THEMES.length+' 幅循环。')+'四幅分别对应热力学、希腊哲学、认知心理学与贝叶斯推断；点开可全幅预览，也可单独设为设备壁纸。</p>');
+ var supported=rotationSupported(),on=rotationEnabled();
+ var head=(supported?'<button class="theme-rotate" data-action="rotate"><span>锁屏轮播</span><em'+(on?' class="on"':'')+'>'+(on?'已开启':'已关闭')+'</em></button>':'');
+ openPanel('锁屏壁纸',head+rows+'<p class="theme-note">'+(supported?(on?'轮播中：每次锁屏随机换一幅，'+THEMES.length+' 幅不重复轮换。':'开启后每次锁屏随机换一幅，'+THEMES.length+' 幅不重复轮换。'):'')+'四幅分别对应热力学、希腊哲学、认知心理学与贝叶斯推断；点开可全幅预览，也可单独设为设备壁纸。</p>');
 }
+function rotationSupported(){if(!native)return true;try{return !!window.SageNative.rotationSupported();}catch(e){return false;}}
 function rotationEnabled(){if(!native)return false;try{return !!window.SageNative.rotationEnabled();}catch(e){return false;}}
 function toggleRotation(){
  if(!native||!window.SageNative.setRotation){notice('浏览器预览；设备上可开启轮播。');return;}
@@ -87,7 +88,7 @@ function toggleRotation(){
  themePanel();
 }
 function previewTheme(i){
- if(i<0||i>=THEMES.length)return;themeIndex=i;
+ if(i<0||i>=THEMES.length)return;themeIndex=i;document.getElementById('lock-apply').textContent=native&&!rotationSupported()?'系统壁纸设置':'设为壁纸';
  var img=document.getElementById('lock-preview');img.src='/assets/'+THEMES[i].id+'.png';img.hidden=false;
  document.getElementById('paper').className='paper lock-mode';document.getElementById('lock-actions').hidden=true;
 }
@@ -183,22 +184,16 @@ function archivePanel(){
   +'</div>';
  openPanel('阅读档案',html);
 }
-function fillStrip(){
- var s=buildArchive();if(!s.n)return;
- var span=s.min?new Date(s.min*1000).getFullYear()+'—'+new Date(s.max*1000).getFullYear():'';
- document.getElementById('archive-line').textContent=s.n+' 则 · '+s.bookCount+' 本'+(span?' · '+span:'');
- document.getElementById('archive-strip').hidden=false;
-}
 function deepLink(){var m=/^#(.+)$/.exec(location.hash);if(!m)return;var id=decodeURIComponent(m[1]),hit=excerpts.filter(function(q){return q.id===id;})[0];if(hit&&(!currentExcerpt||currentExcerpt.id!==hit.id))displayExcerpt(hit,false);}
-loadExcerpts();loadStats();applyReading();
+loadExcerpts();loadStats();applyReading();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){fitExcerpt();});
 function icon(a){return a&&a.icon?'<img class="app-icon" src="'+esc(a.icon)+'" alt="">':icons.book;}
 function launch(pkg){if(native)window.SageNative.launchApp(pkg);else notice('浏览器预览；App入口在设备上启动。');}
-function openPanel(title,html){home.hidden=true;drawer.hidden=false;document.getElementById('panel-title').textContent=title;panel.innerHTML=html;drawer.scrollTop=0;document.getElementById('back').focus();}
-function back(){home.hidden=false;drawer.hidden=true;panel.innerHTML='';document.getElementById('settings').focus();}window.SageGoHome=back;
+function openPanel(title,html){window.SageNotes.close();home.hidden=true;drawer.hidden=false;document.getElementById('panel-title').textContent=title;panel.innerHTML=html;drawer.scrollTop=0;document.getElementById('back').focus();}
+function back(){window.SageNotes.close();home.hidden=false;drawer.hidden=true;panel.innerHTML='';document.getElementById('settings').focus();}window.SageGoHome=back;
 function showApps(){openPanel('全部应用',apps.length?apps.map(function(a){return '<button class="app-row" data-package="'+esc(a.packageName)+'">'+icon(a)+'<span>'+esc(a.label)+'</span></button>';}).join(''):'<p class="empty">浏览器中无法读取设备应用列表。请在墨水屏上查看已安装的App。</p>');}
 function system(){var row=function(x){return '<button class="system-row" data-action="'+x[0]+'">'+x[1]+'</button>';};var mine=[['archive','阅读档案'],['themes','锁屏壁纸']].map(row).join('');var dev=[['app','微信读书'],['wifi','Wi-Fi'],['brightness','亮度与显示'],['date','日期与时间'],['settings','系统设置'],['oldhome','返回原桌面']].map(row).join('');openPanel('设置',mine+'<p class="panel-sub">设备</p>'+dev+'<button class="system-row" data-action="art">画面注记</button>');}
-function perform(a){if(a==='archive'){archivePanel();return;}if(a==='themes'){themePanel();return;}if(a==='rotate'){toggleRotation();return;}if(a==='art'){var t=THEMES[themeIndex];openPanel(t.name+' · 注','<img class="about-art" src="/assets/'+t.id+'.png" alt=""><p class="art-note">'+esc(t.words)+'</p><p>'+esc(t.note)+'</p>');return;}if(native)window.SageNative.perform(a);else notice('浏览器预览；设备上将打开对应系统入口。');}
-function pinned(){var targets=[{packageName:'com.tencent.weread.eink',label:'微信读书'},{packageName:'com.duokan.einkreader',label:'多看阅读'}];document.getElementById('pinned').innerHTML=targets.filter(function(t){return !native||apps.some(function(a){return a.packageName===t.packageName;});}).map(function(t){var actual=apps.filter(function(a){return a.packageName===t.packageName;})[0];return '<button data-package="'+esc(t.packageName)+'">'+(t.packageName==='com.tencent.weread.eink'?icons.reader:icons.library)+'<span>'+esc(actual?actual.label:t.label)+'</span></button>';}).join('')+'<button id="all-apps">'+icons.apps+'<span>全部应用</span></button>';document.getElementById('all-apps').onclick=showApps;}
-document.addEventListener('click',function(e){var t=e.target.closest('[data-package],[data-action],[data-theme]');if(!t)return;if(t.hasAttribute('data-theme'))previewTheme(parseInt(t.getAttribute('data-theme'),10));else if(t.hasAttribute('data-package'))launch(t.getAttribute('data-package'));else perform(t.getAttribute('data-action'));});document.getElementById('settings').onclick=system;document.getElementById('back').onclick=back;document.getElementById('clock-button').onclick=function(){perform('date');};document.getElementById('archive-strip').onclick=archivePanel;document.getElementById('lock-apply').onclick=applyTheme;document.getElementById('lock-close').onclick=closePreview;document.getElementById('lock-preview').onclick=function(){var a=document.getElementById('lock-actions');if(a.hidden){a.hidden=false;clearTimeout(a.timer);a.timer=setTimeout(function(){a.hidden=true;},6000);}};document.getElementById('mode').onchange=function(e){if(e.target.value==='lock')previewTheme(themeIndex);else{clearPreview();back();}};var QP=new URLSearchParams(location.search);if(QP.has('device'))document.body.classList.add('device-mode');if(QP.get('panel')==='archive')setTimeout(archivePanel,700);else if(QP.get('panel')==='themes')setTimeout(themePanel,700);if(native){try{apps=JSON.parse(window.SageNative.listApps());update(JSON.parse(window.SageNative.deviceState()));}catch(e){notice('应用列表暂不可用，可从设置返回原桌面。');update();}}else{update();setTimeout(function tick(){update();setTimeout(tick,60000-Date.now()%60000);},60000-Date.now()%60000);}pinned();}());
+function perform(a){if(a==='notes'){window.SageNotes.open(openPanel,panel);return;}if(a==='apps'){showApps();return;}if(a==='archive'){archivePanel();return;}if(a==='themes'){themePanel();return;}if(a==='rotate'){toggleRotation();return;}if(a==='art'){var t=THEMES[themeIndex];openPanel(t.name+' · 注','<img class="about-art" src="/assets/'+t.id+'.png" alt=""><p class="art-note">'+esc(t.words)+'</p><p>'+esc(t.note)+'</p>');return;}if(native)window.SageNative.perform(a);else notice('浏览器预览；设备上将打开对应系统入口。');}
+function pinned(){var items=[{packageName:'com.tencent.weread.eink',label:'微信读书',icon:icons.reader},{action:'archive',label:'阅读档案',icon:icons.library},{action:'notes',label:'纸上随记',icon:'<svg class="icon-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 5h13v5M7 5v23h19V16M17 20l-5 1 1-5L25 4l4 4zM22 7l4 4"/></svg>'},{action:'apps',label:'全部应用',icon:icons.apps}];document.getElementById('pinned').innerHTML=items.map(function(t){return '<button '+(t.packageName?'data-package="'+t.packageName+'"':'data-action="'+t.action+'"')+'>'+t.icon+'<span>'+t.label+'</span></button>';}).join('');}
+document.addEventListener('click',function(e){var t=e.target.closest('[data-package],[data-action],[data-theme]');if(!t)return;if(t.hasAttribute('data-theme'))previewTheme(parseInt(t.getAttribute('data-theme'),10));else if(t.hasAttribute('data-package'))launch(t.getAttribute('data-package'));else perform(t.getAttribute('data-action'));});document.getElementById('settings').onclick=system;document.getElementById('back').onclick=back;document.getElementById('clock-button').onclick=function(){perform('date');};document.getElementById('lock-apply').onclick=applyTheme;document.getElementById('lock-close').onclick=closePreview;document.getElementById('lock-preview').onclick=function(){var a=document.getElementById('lock-actions');if(a.hidden){a.hidden=false;clearTimeout(a.timer);a.timer=setTimeout(function(){a.hidden=true;},6000);}};document.getElementById('mode').onchange=function(e){if(e.target.value==='lock')previewTheme(themeIndex);else{clearPreview();back();}};var QP=new URLSearchParams(location.search);if(QP.has('device'))document.body.classList.add('device-mode');if(QP.get('panel')==='archive')setTimeout(archivePanel,700);else if(QP.get('panel')==='themes')setTimeout(themePanel,700);if(native){try{apps=JSON.parse(window.SageNative.listApps());update(JSON.parse(window.SageNative.deviceState()));}catch(e){notice('应用列表暂不可用，可从设置返回原桌面。');update();}}else{update();setTimeout(function tick(){update();setTimeout(tick,60000-Date.now()%60000);},60000-Date.now()%60000);}pinned();}());
 
 
