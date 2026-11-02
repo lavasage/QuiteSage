@@ -127,3 +127,7 @@ html,body{height:100%}
 
 @font-face{font-family:"QuiteSage Serif";src:url("/assets/fonts/QuiteSageSerif-Regular.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
 #excerpt-text{font-family:"QuiteSage Serif",var(--serif)}
+
+#excerpt-text.setup-empty{font:400 23px/1.9 var(--sans);color:#555}.setup-foot{margin-top:30px;font-size:15px!important}
+
+.next-excerpt.setup-action{min-height:48px;padding:8px 0;align-items:center}

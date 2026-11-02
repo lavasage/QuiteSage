@@ -1,23 +1,7 @@
 const http=require('http'),fs=require('fs'),path=require('path');
-const root=__dirname;
-const files={'/':['index.html','text/html; charset=utf-8'],'/notes.js':['notes.js','text/javascript; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8']};
-for(const n of fs.readdirSync(path.join(root,'assets'))){if(n.endsWith('.png'))files['/assets/'+n]=['assets/'+n,'image/png'];} 
-files['/assets/fonts/QuiteSageSerif-Regular.woff2']=['assets/fonts/QuiteSageSerif-Regular.woff2','font/woff2'];
-const pick=(real,demo)=>fs.existsSync(path.join(root,real))?real:demo;
-files['/api/excerpts']=[pick('../.private/excerpts.json','../.private/demo-excerpts.json'),'application/json; charset=utf-8'];
-files['/api/stats']=[pick('../.private/stats.json','../.private/demo-stats.json'),'application/json; charset=utf-8'];
+const root=__dirname,files={'/':['index.html','text/html; charset=utf-8'],'/notes.js':['notes.js','text/javascript'],'/data-setup.js':['data-setup.js','text/javascript'],'/agent-setup.txt':['agent-setup.txt','text/plain; charset=utf-8'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css']};
+for(const n of ['plate-entropy','plate-cave','plate-attention','plate-belief'])files['/assets/'+n+'.png']=['assets/'+n+'.png','image/png'];files['/assets/fonts/QuiteSageSerif-Regular.woff2']=['assets/fonts/QuiteSageSerif-Regular.woff2','font/woff2'];
+const {validate}=require('../tools/export-reading-data.cjs');
 const port=Number(process.env.SAGE_PORT||4173);
-http.createServer((req,res)=>{
- const host=req.headers.host;
- if(!['127.0.0.1:'+port,'localhost:'+port].includes(host)||req.headers['sec-fetch-site']==='cross-site'){res.writeHead(403);res.end();return;}
- if(req.method!=='GET'){res.writeHead(405);res.end();return;}
- res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
- res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
- let url;try{url=new URL(req.url,'http://'+host).pathname;}catch{res.writeHead(400);res.end();return;}
- if(!files[url]){res.writeHead(404);res.end('Not found');return;}
- const [name,type]=files[url];
- fs.open(path.join(root,name),'r',(err,fd)=>{
-  if(err){res.writeHead(503);res.end('Local data unavailable');return;}
-  res.writeHead(200,{'Content-Type':type});fs.createReadStream(null,{fd,autoClose:true}).pipe(res);
- });
-}).listen(port,'127.0.0.1',()=>console.log('QuiteSage: http://127.0.0.1:'+port+' (local snapshot only)'));
+function data(part){if(!process.env.SAGE_DATA_BUNDLE)return part==='excerpts'?{connected:false,available:false,excerpts:[]}:{connected:false,available:false};const b=validate(JSON.parse(fs.readFileSync(path.resolve(process.env.SAGE_DATA_BUNDLE),'utf8')));if(b.schemaVersion!==1||b.source!=='weread-skill')throw Error('Invalid explicitly selected bundle');const value=b[part];return Object.assign({},value||{},part==='excerpts'&&!value?{excerpts:[]}:{},{connected:true,available:!!value});}
+http.createServer((req,res)=>{const host=req.headers.host;if(!['127.0.0.1:'+port,'localhost:'+port].includes(host)||req.headers['sec-fetch-site']==='cross-site'){res.writeHead(403);res.end();return;}if(req.method!=='GET'){res.writeHead(405);res.end();return;}res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");let u;try{u=new URL(req.url,'http://'+host).pathname;}catch(e){res.writeHead(400);res.end();return;}if(u==='/api/excerpts'||u==='/api/stats'){try{res.setHeader('Content-Type','application/json; charset=utf-8');res.end(JSON.stringify(data(u.slice(5))));}catch(e){res.writeHead(503);res.end('Selected data unavailable');}return;}if(!files[u]){res.writeHead(404);res.end();return;}const [file,type]=files[u];fs.readFile(path.join(root,file),(err,b)=>{if(err){res.writeHead(503);res.end();return;}res.writeHead(200,{'Content-Type':type});res.end(b);});}).listen(port,'127.0.0.1',()=>console.log('QuiteSage: http://127.0.0.1:'+port+' (empty by default; explicit user bundle only)'));

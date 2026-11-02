@@ -1,6 +1,7 @@
 const fs=require('fs'),path=require('path'),cp=require('child_process');
 const root=path.resolve(__dirname,'..');
-const adb='C:/Users/lcc30/AppData/Local/Android/Sdk/platform-tools/adb.exe';
+const adb=process.env.ADB_PATH||path.join(process.env.ANDROID_SDK||process.env.ANDROID_HOME||path.join(process.env.LOCALAPPDATA||'', 'Android','Sdk'),'platform-tools','adb.exe');
+const setHome=process.argv.includes('--set-home'),grantUsage=process.argv.includes('--grant-usage-access');
 const serialIndex=process.argv.indexOf('--serial');
 function detectSerial(){
  // 只连一台设备时不用手写序列号；多台再要求 --serial
@@ -23,25 +24,25 @@ function run(args,timeout=12000){return cp.spawnSync(adb,['-s',serial,...args],{
 function isCurrent(output){return new RegExp('versionCode='+expectedCode+'(?:\\s|$)').test(output)&&output.split('\n').some(line=>line.trim()==='versionName='+expectedName);}
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 (async()=>{
- const deadline=Date.now()+waitMs;let attempts=0,nextInstall=0,verifiedInstall=false,grantedUsage=false;
- console.log('Waiting for EPD106 at '+serial+'; target '+expectedName+' / code '+expectedCode+'.');
+ const deadline=Date.now()+waitMs;let attempts=0,nextInstall=0,verifiedInstall=false,grantedUsage=false,restarted=false;
+ console.log('Waiting for device at '+serial+'; target '+expectedName+' / code '+expectedCode+'.');
  while(Date.now()<deadline){
   const version=run(['shell','dumpsys','package',pkg],4000);
   if(version.status===0&&isCurrent(version.stdout||'')){
    if(!verifiedInstall){console.log('Device package version verified: '+expectedName+' / code '+expectedCode+'.');verifiedInstall=true;}
-   if(!grantedUsage){
+   if(grantUsage&&!grantedUsage){
     // 阅读天数要判断"今天有没有打开微信读书"，靠用量统计；该权限只能由系统特殊授权。
     const grant=run(['shell','appops','set',pkg,'GET_USAGE_STATS','allow'],4000);
     if(grant.status===0)grantedUsage=true;
    }
-   const home=run(['shell','cmd','package','set-home-activity',pkg+'/.SageActivity'],4000);
-   if(home.status!==0){await pause(1000);continue;}
+   if(setHome){const home=run(['shell','cmd','package','set-home-activity',pkg+'/.SageActivity'],4000);if(home.status!==0){await pause(1000);continue;}}
+   if(!restarted){const stop=run(['shell','am','force-stop','--user','0',pkg],4000);if(stop.status!==0){await pause(1000);continue;}restarted=true;}
    const start=run(['shell','am','start','-n',pkg+'/.SageActivity'],4000);
    if(start.status!==0){await pause(1000);continue;}
    const resolved=run(['shell','cmd','package','resolve-activity','--brief','-a','android.intent.action.MAIN','-c','android.intent.category.HOME'],4000);
    const foreground=run(['shell','dumpsys','activity','activities'],4000);
-   if(resolved.status===0&&(resolved.stdout||'').includes(pkg)&&/mResumedActivity:.*com\.sagepaper\.launcher/.test(foreground.stdout||'')){
-    console.log('Default HOME and foreground verified.');return;
+   if((!setHome||(resolved.status===0&&(resolved.stdout||'').includes(pkg)))&&/mResumedActivity:.*com\.sagepaper\.launcher/.test(foreground.stdout||'')){
+    console.log(setHome?'Default HOME and foreground verified.':'Foreground verified; existing default HOME preserved.');return;
    }
   }else if(version.status===0&&Date.now()>=nextInstall&&attempts<3){
    attempts++;console.log('Installing update (attempt '+attempts+').');

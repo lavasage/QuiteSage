@@ -37,7 +37,9 @@ public class SageActivity extends Activity {
     private boolean registered;
     private boolean screenRegistered;
     private static final String ORIGIN="https://sage.local";
-    private static final String READER="com.tencent.weread.eink";
+    private static final String[] READERS={"com.tencent.weread","com.tencent.weread.eink"};
+    private ReadingDataStore readingData;
+    private static final int IMPORT_READING=4102;
     private static final String[] PLATES={"plate-entropy","plate-cave","plate-attention","plate-belief"};
     private final BroadcastReceiver updates=new BroadcastReceiver(){public void onReceive(Context c,Intent i){updateDevice();}};
     private final BroadcastReceiver screenOn=new BroadcastReceiver(){public void onReceive(Context c,Intent i){if(Intent.ACTION_SCREEN_ON.equals(i.getAction()))rotateWallpaper();}};
@@ -45,10 +47,12 @@ public class SageActivity extends Activity {
     private static String dayKey(){return new SimpleDateFormat("yyyy-MM-dd",Locale.US).format(new Date());}
     public void onCreate(Bundle state){
         super.onCreate(state);
+        readingData=new ReadingDataStore(this);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         hideSystemBars();
         lockStatusBar();
         web=new WebView(this); web.setBackgroundColor(Color.WHITE);setContentView(web);
+        if(prefs().getInt("privacyVersion",0)<2){web.clearCache(true);prefs().edit().putInt("privacyVersion",2).putBoolean("rotate",false).apply();}
         WebSettings s=web.getSettings();s.setJavaScriptEnabled(true);s.setDomStorageEnabled(true);
         s.setAllowFileAccess(false);s.setAllowContentAccess(false);s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setSupportMultipleWindows(false);s.setBuiltInZoomControls(false);s.setDisplayZoomControls(false);
@@ -63,10 +67,11 @@ public class SageActivity extends Activity {
                     String p=u.getPath(); InputStream in;String mime;
                     if("/".equals(p)||"/index.html".equals(p)){in=getAssets().open("index.html");mime="text/html";}
                     else if("/style.css".equals(p)){in=getAssets().open("style.css");mime="text/css";}
+                    else if("/data-setup.js".equals(p)){in=getAssets().open("data-setup.js");mime="text/javascript";}
                     else if("/notes.js".equals(p)){in=getAssets().open("notes.js");mime="text/javascript";}
                     else if("/app.js".equals(p)){in=getAssets().open("app.js");mime="text/javascript";}
-                    else if("/api/excerpts".equals(p)){in=getAssets().open("excerpts.json");mime="application/json";}
-                    else if("/api/stats".equals(p)){in=getAssets().open("stats.json");mime="application/json";}
+                    else if("/api/excerpts".equals(p)){in=new ByteArrayInputStream(readingData.part("excerpts").getBytes("UTF-8"));mime="application/json";}
+                    else if("/api/stats".equals(p)){in=new ByteArrayInputStream(readingData.part("stats").getBytes("UTF-8"));mime="application/json";}
                     else if("/assets/fonts/QuiteSageSerif-Regular.woff2".equals(p)){in=getAssets().open("fonts/QuiteSageSerif-Regular.woff2");mime="font/woff2";}
                     else if(p!=null&&p.indexOf("/assets/")==0){
                         String name=p.substring("/assets/".length());
@@ -122,19 +127,26 @@ public class SageActivity extends Activity {
         if("https".equals(u.getScheme())&&"sage.local".equals(u.getHost()))return false;
         openReader(u.toString());return true;
     }
-    private void openReader(String url){
-        try{
-            prefs().edit().putString("lastReaderLaunch",dayKey()).apply();
-            Uri u=Uri.parse(url);
-            if("https".equals(u.getScheme())&&"weread.qq.com".equals(u.getHost())){
-                Intent i=new Intent(Intent.ACTION_VIEW,u);i.setPackage(READER);
-                if(i.resolveActivity(getPackageManager())!=null){startActivity(i);return;}
-            }
-        }catch(Exception ignored){}
-        Intent fallback=getPackageManager().getLaunchIntentForPackage(READER);
-        if(fallback!=null){try{startActivity(fallback);return;}catch(Exception ignored){}}
-        Toast.makeText(this,"未找到可打开的微信读书墨水屏版",Toast.LENGTH_LONG).show();
+    private String readerPackage(){
+        String preferred=prefs().getString("readerPackage","");
+        if(isReader(preferred)&&getPackageManager().getLaunchIntentForPackage(preferred)!=null)return preferred;
+        String[] choices=hasOemWallpaper()?new String[]{READERS[1],READERS[0]}:READERS;
+        for(String pkg:choices)if(getPackageManager().getLaunchIntentForPackage(pkg)!=null)return pkg;
+        return "";
     }
+    private boolean isReader(String pkg){return READERS[0].equals(pkg)||READERS[1].equals(pkg);}
+    private void openReader(String url){
+        String pkg=readerPackage();if(pkg.length()==0){Toast.makeText(this,"未安装微信读书",Toast.LENGTH_LONG).show();return;}
+        try{Uri u=Uri.parse(url);if("https".equals(u.getScheme())&&"weread.qq.com".equals(u.getHost())){Intent deep=new Intent(Intent.ACTION_VIEW,u).setPackage(pkg);if(deep.resolveActivity(getPackageManager())!=null){startActivity(deep);markReader(pkg);return;}}}catch(Exception ignored){}
+        launchApp(pkg);
+    }
+    private void markReader(String pkg){prefs().edit().putString("lastReaderLaunch",dayKey()).putString("lastReaderPackage",pkg).apply();}
+    private String setupInstructions(){try{InputStream in=getAssets().open("agent-setup.txt");try{return new String(ReadingDataStore.readLimited(in),"UTF-8");}finally{in.close();}}catch(Exception e){return "请阅读腾讯官方微信读书 Skill：https://github.com/Tencent/WeChatReading";}}
+    private void importReading(){try{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);startActivityForResult(i,IMPORT_READING);}catch(Exception e){Toast.makeText(this,"请安装或启用系统文件管理器",Toast.LENGTH_LONG).show();}}
+    private void shareSetup(){Intent i=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,setupInstructions());try{startActivity(Intent.createChooser(i,"交给你的 Agent"));}catch(Exception e){Toast.makeText(this,"可使用复制说明",Toast.LENGTH_SHORT).show();}}
+    protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);if(request!=IMPORT_READING||result!=RESULT_OK||data==null||data.getData()==null)return;final Uri uri=data.getData();new Thread(new Runnable(){public void run(){try{InputStream in=getContentResolver().openInputStream(uri);if(in==null)throw new IOException("无法打开数据文件");String raw;try{raw=new String(ReadingDataStore.readLimited(in),"UTF-8");}finally{in.close();}readingData.replace(raw);runOnUiThread(new Runnable(){public void run(){reloadReading();Toast.makeText(SageActivity.this,"阅读数据已导入",Toast.LENGTH_SHORT).show();}});}catch(final Exception e){runOnUiThread(new Runnable(){public void run(){Toast.makeText(SageActivity.this,"导入未完成："+e.getMessage(),Toast.LENGTH_LONG).show();}});}}},"ReadingImport").start();}
+    private void reloadReading(){web.evaluateJavascript("try{localStorage.removeItem('sage-last-excerpt');localStorage.removeItem('sage-read-days');}catch(e){}",new ValueCallback<String>(){public void onReceiveValue(String value){web.reload();}});}
+    private void clearReading(){new android.app.AlertDialog.Builder(this).setTitle("移除本机阅读数据？").setMessage("纸上随记会保留。").setNegativeButton("取消",null).setPositiveButton("移除",new DialogInterface.OnClickListener(){public void onClick(DialogInterface d,int w){readingData.clear();prefs().edit().remove("lastReaderLaunch").remove("lastReaderPackage").apply();reloadReading();}}).show();}
     private String deviceState(){
         JSONObject j=new JSONObject();try{
             Intent b=registerReceiver(null,new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
@@ -165,7 +177,7 @@ public class SageActivity extends Activity {
             try{JSONObject j=new JSONObject();j.put("packageName",pkg);j.put("label",info.loadLabel(getPackageManager()).toString());Drawable d=info.loadIcon(getPackageManager());Bitmap b=Bitmap.createBitmap(64,64,Bitmap.Config.ARGB_8888);Canvas c=new Canvas(b);d.setBounds(0,0,64,64);d.draw(c);ByteArrayOutputStream bytes=new ByteArrayOutputStream();b.compress(Bitmap.CompressFormat.PNG,100,bytes);j.put("icon","data:image/png;base64,"+Base64.encodeToString(bytes.toByteArray(),Base64.NO_WRAP));b.recycle();a.put(j);}catch(Exception ignored){}
         }return a.toString();
     }
-    private void launchApp(String pkg){try{Intent i=getPackageManager().getLaunchIntentForPackage(pkg);if(i!=null){if(READER.equals(pkg))prefs().edit().putString("lastReaderLaunch",dayKey()).apply();startActivity(i);return;}}catch(Exception ignored){}Toast.makeText(this,"应用未安装或无法启动",Toast.LENGTH_LONG).show();}
+    private void launchApp(String pkg){try{Intent i=getPackageManager().getLaunchIntentForPackage(pkg);if(i!=null){startActivity(i);if(isReader(pkg))markReader(pkg);return;}}catch(Exception ignored){}Toast.makeText(this,"应用未安装或无法启动",Toast.LENGTH_LONG).show();}
     private boolean hasOemWallpaper(){try{Class.forName("android.util.MoguWallPaper");return true;}catch(ClassNotFoundException absent){return false;}}
     private boolean applyWallpaper(String name,boolean toast){
         if(hasOemWallpaper()){
@@ -193,7 +205,7 @@ public class SageActivity extends Activity {
     private void rotateWallpaper(){
         if(hasOemWallpaper())return;
         SharedPreferences p=prefs();
-        if(!p.getBoolean("rotate",true))return;
+        if(!p.getBoolean("rotate",false))return;
         String bag=p.getString("rotateBag","");
         if(bag.length()==0){
             List<Integer> order=new ArrayList<Integer>();
@@ -209,7 +221,8 @@ public class SageActivity extends Activity {
     }
     /* 今日是否打开过微信读书：优先用量统计，未授权时退回"从桌面启动过"的记录。 */
     private boolean readerOpenedToday(){
-        boolean fallback=dayKey().equals(prefs().getString("lastReaderLaunch",""));
+        String target=readerPackage();if(target.length()==0)return false;
+        boolean fallback=target.equals(prefs().getString("lastReaderPackage",""))&&dayKey().equals(prefs().getString("lastReaderLaunch",""));
         long from;
         Calendar c=Calendar.getInstance();c.set(Calendar.HOUR_OF_DAY,0);c.set(Calendar.MINUTE,0);c.set(Calendar.SECOND,0);c.set(Calendar.MILLISECOND,0);
         from=c.getTimeInMillis();
@@ -219,20 +232,28 @@ public class SageActivity extends Activity {
             long now=System.currentTimeMillis();
             List<UsageStats> stats=usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY,from,now);
             if(stats!=null)for(UsageStats u:stats){
-                if(READER.equals(u.getPackageName())&&u.getLastTimeUsed()>=from)return true;
+                if(target.equals(u.getPackageName())&&u.getLastTimeUsed()>=from)return true;
             }
             UsageEvents events=usm.queryEvents(from,now);
             if(events!=null){
                 UsageEvents.Event e=new UsageEvents.Event();
                 while(events.hasNextEvent()){
                     events.getNextEvent(e);
-                    if(READER.equals(e.getPackageName())&&e.getEventType()==1)return true;
+                    if(target.equals(e.getPackageName())&&e.getEventType()==1)return true;
                 }
             }
             return fallback;
         }catch(Exception ex){return fallback;}
     }
     public class Bridge {
+        @JavascriptInterface public String readingStatus(){return readingData.status();}
+        @JavascriptInterface public String readerPackage(){return SageActivity.this.readerPackage();}
+        @JavascriptInterface public String setupInstructions(){return SageActivity.this.setupInstructions();}
+        @JavascriptInterface public void importReading(){runOnUiThread(new Runnable(){public void run(){SageActivity.this.importReading();}});}
+        @JavascriptInterface public void clearReading(){runOnUiThread(new Runnable(){public void run(){SageActivity.this.clearReading();}});}
+        @JavascriptInterface public void shareSetup(){runOnUiThread(new Runnable(){public void run(){SageActivity.this.shareSetup();}});}
+        @JavascriptInterface public void copySetup(){runOnUiThread(new Runnable(){public void run(){android.content.ClipboardManager c=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);c.setPrimaryClip(ClipData.newPlainText("QuiteSage 配置说明",setupInstructions()));Toast.makeText(SageActivity.this,"配置说明已复制",Toast.LENGTH_SHORT).show();}});}
+
         @JavascriptInterface public String listApps(){return SageActivity.this.listApps();}
         @JavascriptInterface public void launchApp(final String p){runOnUiThread(new Runnable(){public void run(){SageActivity.this.launchApp(p);}});}
         @JavascriptInterface public void setWallpaper(final String n){runOnUiThread(new Runnable(){public void run(){
@@ -240,7 +261,7 @@ public class SageActivity extends Activity {
             applyWallpaper(n,true);
         }});}
         @JavascriptInterface public boolean rotationSupported(){return !hasOemWallpaper();}
-        @JavascriptInterface public boolean rotationEnabled(){return !hasOemWallpaper()&&prefs().getBoolean("rotate",true);}
+        @JavascriptInterface public boolean rotationEnabled(){return !hasOemWallpaper()&&prefs().getBoolean("rotate",false);}
         @JavascriptInterface public void setRotation(final boolean on){runOnUiThread(new Runnable(){public void run(){
             SharedPreferences p=prefs();p.edit().putBoolean("rotate",on).apply();
             Toast.makeText(SageActivity.this,on?"轮播已开启：每次进入锁屏换一张":"轮播已关闭",Toast.LENGTH_SHORT).show();

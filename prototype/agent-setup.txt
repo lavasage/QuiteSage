@@ -1,0 +1,12 @@
+请帮我配置 QuiteSage 墨水屏桌面。请先阅读腾讯官方微信读书 Skill 最新文档：https://github.com/Tencent/WeChatReading
+
+1. 按官方文档为我安装 Skill（官方当前安装命令为 npx skills add Tencent/WeChatReading -g）。引导我使用本人的微信读书账户获取 API Key，并仅保存在你的本机安全配置或 WEREAD_API_KEY 环境变量中。不要让我把密钥发到公共对话，不要把认证信息写入导出文件。
+2. 在我确认授权后，只读获取我本人的书架、真实划线、阅读统计。不要使用 QuiteSage 作者的数据、旧缓存、示例摘抄或其他账户的内容；无法取得的字段保持缺省，不要编造。
+3. 交付一个 UTF-8 JSON 文件 quite-sage-data.json，格式如下。没有数据时保持空数组或 null；不要把示例文字当作真实划线。
+
+{"schemaVersion":1,"source":"weread-skill","exportedAt":"实际导出时间的 ISO 8601 字符串","ownerLabel":"可选的本机显示名称","excerpts":{"fetchedAt":"实际获取时间","excerpts":[]},"stats":null}
+
+每条 excerpts.excerpts 记录必须有字符串 id、text（原划线）、title（书名）、author（作者）。可选 bookId、chapter、createdAt（Unix 秒）、evidence.fetchedAt（ISO 日期）。保留真实原文，不根据单次划线替我归纳立场。
+可选 stats 为对象，支持 fetchedAt、totalReadTime（秒）、readStat（[{label,value}]）、years（[{year,level:[12 个 0..4 整数]}]）、hours（24 项真实小时累计数值）、daily（YYYY-MM-DD 到实际时长或真实阅读标志的映射）、categories（[{title,hours}]）。可缺省没有来源的字段；stats 为 null 代表暂未获得统计。不要用零冒充不可获取的数据。
+文件最大 5 MB、最多 10000 条划线；禁止包含 API Key、访问令牌、Cookie、密码或原始鉴权响应。导出前核对数据属于我本人的账户。
+4. 把该文件交给我，由我在设备 QuiteSage → 设置 → 阅读数据 → 导入阅读数据 中选择导入。以后更新也使用同一导入流程。身份认证留在我自己的 Agent 环境，APK 不接收密钥、不内置任何人的阅读记录。
