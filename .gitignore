@@ -1,0 +1,25 @@
+# 本地数据与隐私：不进仓库
+.private/
+.review/
+.workbuddy/
+.impeccable/
+
+# 构建产物与签名
+android/build/
+*.apk
+*.jks
+*.keystore
+
+# 第三方与参考资料
+vendor/
+node_modules/
+
+# 个人阅读报告
+reports/
+
+# 环境
+.env
+.env.*
+!.env.example
+*.key
+*.dpapi

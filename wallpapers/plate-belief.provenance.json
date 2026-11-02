@@ -1,0 +1,7 @@
+{
+  "tool": "tools/make-wallpapers.py (procedural drawing, no image model)",
+  "title": "误差与信念",
+  "words": "先验 · 证据 · 更新",
+  "note": "一次观测之后：宽的先验（虚线）收紧成窄的后验（实线）。信念不是被推翻，是被证据重新加权。",
+  "size": "1078x1459"
+}

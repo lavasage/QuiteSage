@@ -1,0 +1,9 @@
+{
+  "tool":"built-in image_gen",
+  "mode":"edit",
+  "source":"C:/Users/lcc30/.codex/generated_images/01a1979e-426b-70b0-a871-8217b72f56b7/exec-f350c6dc-2633-40c9-b994-fb51fd66f138.png",
+  "reference":"C:/Users/lcc30/.codex/generated_images/01a1979e-426b-70b0-a871-8217b72f56b7/exec-15b23a96-3c38-4c59-bbac-bc5f81b91cd9.png",
+  "sha256":"DA8FC1EA0FED73CB2090BDA9F6F204FC31D86A3E2E5087E876D07AC989D2888E",
+  "prompt":"Use case: precise-object-edit. Extract and finish ONLY the LEFT lockscreen artwork of this approved design board as a standalone portrait e-ink wallpaper. Preserve its woody opened seed pod, seeds, stem and leaves, small cross section and measurement leader lines, engraving style, Chinese lettering, and generous asymmetric composition. Remove the entire right desktop design, board labels 锁屏 and 桌面, surrounding gray board, borders, and all mockup framing. Output one clean full-bleed portrait image in exact aspect ratio 758:1024 (target 758x1024 if available), pure white background, black ink and grayscale, no texture or shadows. Existing text to preserve exactly: small 'SAGE PAPER', title '种子与尺度', footer '概念 · 生命 · 语言'. Match the approved left artwork closely, do not invent a new botanical subject or add any app controls, clock or device. This final wallpaper is also the common artwork asset used behind a real HTML launcher crop. Strong printable contours suitable for a 758px e-ink display.",
+  "meaning":"原创艺术意象，不对应已确认物种、测量数据或用户人格。"
+}

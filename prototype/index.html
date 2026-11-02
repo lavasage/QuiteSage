@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QuiteSage · 摘抄页预览</title><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="preview-bar"><span>SAGE PAPER · 摘抄页预览</span><label>预览 <select id="mode"><option value="desktop">桌面</option><option value="lock">锁屏</option></select></label></div>
+<div class="paper" id="paper">
+<section id="home" class="home">
+<header class="time-widget">
+<button id="clock-button" aria-label="打开日期与时间设置"><time id="clock">--:--</time></button>
+<div class="calendar"><time id="calendar"></time><span id="weekday"></span></div><span id="streak" class="streak" hidden></span><span id="battery">浏览器预览</span><span id="wifi" class="wifi" hidden></span>
+<button id="settings" aria-label="设置" title="设置"><svg class="settings-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="m13 3-1 4-3 2-4-1-2 4 3 3v3l-3 3 2 4 4-1 3 2 1 4h5l1-4 3-2 4 1 2-4-3-3v-3l3-3-2-4-4 1-3-2-1-4z"/><circle cx="15.5" cy="16.5" r="4.5"/></svg></button>
+</header>
+<section class="excerpt" aria-label="随机摘抄"><div class="excerpt-page">
+<blockquote id="excerpt-text" class="loading" aria-live="polite">正在整理你的划线…</blockquote>
+<button id="excerpt-source" class="excerpt-source" hidden></button>
+<button id="next-excerpt" class="next-excerpt" disabled><span>换一则</span></button>
+</div></section>
+<footer><button id="archive-strip" class="archive-strip" hidden><span id="archive-line"></span><span class="archive-more">阅读档案</span></button><nav id="pinned" aria-label="应用入口"></nav></footer>
+</section>
+<section id="drawer" class="drawer" hidden><header class="page-head"><h1 id="panel-title">全部应用</h1><button id="back">返回桌面</button></header><div id="panel-content"></div></section>
+<img id="lock-preview" src="/assets/plate-entropy.png" alt="锁屏壁纸预览" hidden><div id="lock-actions" class="lock-actions" hidden><button id="lock-apply">设为壁纸</button><button id="lock-close">返回</button></div><div id="notice" role="status" aria-live="polite"></div>
+</div><script src="/app.js"></script>
+</body></html>
